@@ -1,0 +1,32 @@
+name: Deploy Website
+
+on:
+  issues: 
+    types: [opened, edited, deleted, closed, reopened, labeled, unlabeled, milestoned, demilestoned]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [14.x]
+
+    steps:
+      - env: 
+          CONTEXT: ${{ toJSON(github.event) }}
+        run: |
+          echo $CONTEXT
+      
+    # - name: Checkout repository
+    #   uses: actions/checkout@v2
+
+    # - name: Set up Node.js
+    #   uses: actions/setup-node@v1
+    #   with:
+    #     node-version: ${{ matrix.node-version }}
+
+    # - name: Install dependencies
+    #   run: npm install
+
+    # - name: Run tests
+    #   run: npm run test
