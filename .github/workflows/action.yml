@@ -22,7 +22,7 @@ jobs:
           echo $BRANCH
         
       - name: condition 1
-        if: contains($USERS, github.event.sender.login)
+        if: contains(env.USERS, github.event.sender.login)
         run: echo 11
 
       - name: condition 2
