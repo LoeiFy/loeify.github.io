@@ -14,12 +14,10 @@ jobs:
     steps:
       - env: 
           EVENT_CONTEXT: ${{ toJSON(github.event) }}
-          USER: ${{ GITHUB_REPOSITORY_OWNER }}
-          BRANCH: ${{ GITHUB_REF##*/ }}
         run: |
           echo $EVENT_CONTEXT
-          echo $USER
-          echo $BRANCH
+          echo $GITHUB_REPOSITORY_OWNER
+          echo $GITHUB_REF
       
     # - name: Checkout repository
     #   uses: actions/checkout@v2
