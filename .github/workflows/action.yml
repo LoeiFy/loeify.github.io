@@ -17,7 +17,17 @@ jobs:
         run: |
           echo $EVENT_CONTEXT
           echo $GITHUB_REPOSITORY_OWNER
-          echo $GITHUB_REF
+          echo ${GITHUB_REF##*/}
+          echo $USERS
+          echo $BRANCH
+        
+      - name: condition 1
+        if: contains($USERS, github.event.sender.login)
+        run: echo 11
+
+      - name: condition 2
+        if: contains('11', github.event.sender.login)
+        run: echo 22
       
     # - name: Checkout repository
     #   uses: actions/checkout@v2
