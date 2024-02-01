@@ -14,12 +14,14 @@ jobs:
     steps:
       - env: 
           EVENT_CONTEXT: ${{ toJSON(github.event) }}
-          USERS: ${{ env.USERS }}
+          LOGIN: ${{ github.event.sender.login }}
         run: |
           echo $EVENT_CONTEXT
           echo $GITHUB_REPOSITORY_OWNER
           echo ${GITHUB_REF##*/}
-          echo $USERS
+          echo "${{ env.USERS }}"
+          echo "${{ github.event.sender.login }}"
+          echo $LOGIN
         
       - name: condition 1
         if: contains(env.USERS, github.event.sender.login)
