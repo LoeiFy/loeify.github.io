@@ -14,6 +14,7 @@ jobs:
     steps:
       - env: 
           EVENT_CONTEXT: ${{ toJSON(github.event) }}
+          ENV: ${{ toJSON(env) }} 
           LOGIN: ${{ github.event.sender.login }}
         run: |
           echo $EVENT_CONTEXT
@@ -22,6 +23,7 @@ jobs:
           echo "${{ env.USERS }}"
           echo "${{ github.event.sender.login }}"
           echo $LOGIN
+          echo $ENV
         
       - name: condition 1
         if: contains(env.USERS, github.event.sender.login)
