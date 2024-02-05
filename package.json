@@ -1,0 +1,23 @@
+{
+  "name": "loeify.github.io",
+  "private": true,
+  "version": "0.1.0",
+  "description": "blog",
+  "scripts": {
+    "start": "acyort pigeon --users LoeiFy --repo=LoeiFy/loeify.github.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LoeiFy/loeify.github.io.git"
+  },
+  "author": "LoeiFy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LoeiFy/loeify.github.io/issues"
+  },
+  "homepage": "https://github.com/LoeiFy/loeify.github.io#readme",
+  "devDependencies": {
+    "@acyort/pigeon": "^1.0.0",
+    "acyort": "^4.0.0"
+  }
+}
