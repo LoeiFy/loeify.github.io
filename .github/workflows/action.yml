@@ -8,6 +8,19 @@ jobs:
   checker:
     runs-on: ubuntu-latest
     steps:
+      - env:
+          EVENT_CONTEXT: ${{ toJSON(github.event) }}
+          VARS: ${{ toJSON(vars) }}
+          LOGIN: ${{ github.event.sender.login }}
+        run: |
+          echo $GITHUB_REPOSITORY_OWNER
+          echo ${GITHUB_REF##*/}
+          echo "${{ vars.USERS }}"
+          echo "${{ github.event.sender.login }}"
+          echo "${{ github.repository_owner }}"
+          echo $LOGIN
+          echo $VARS
+
       - name: Check Trigger
         env:
           USERS: ${{ vars.USERS || github.repository_owner }}
@@ -22,22 +35,16 @@ jobs:
         node-version: [18.x]
 
     steps:
-      - env:
-          EVENT_CONTEXT: ${{ toJSON(github.event) }}
-          VARS: ${{ toJSON(vars) }}
-          LOGIN: ${{ github.event.sender.login }}
-        run: |
-          echo $GITHUB_REPOSITORY_OWNER
-          echo ${GITHUB_REF##*/}
-          echo "${{ vars.USERS }}"
-          echo "${{ github.event.sender.login }}"
-          echo $LOGIN
-          echo $VARS
-
       - name: Next
         env:
           REPO: ${{ github.repository }}
         run: echo $REPO
+
+      - name: Check Trigger
+        env:
+          USERS: ${{ vars.USERS || github.repository_owner }}
+        if: contains(env.USERS, github.event.sender.login)
+        run: exit 0
 
     # - name: Checkout repository
     #   uses: actions/checkout@v2
