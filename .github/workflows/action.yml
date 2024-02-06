@@ -5,11 +5,12 @@ on:
     types: [opened, edited, deleted, closed, reopened, labeled, unlabeled, milestoned, demilestoned]
 
 jobs:
-  setup_env:
+  deploy:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         node-version: [18.x]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,12 +20,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-  build:
-    needs: [setup_env]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: run
+      - name: build
         env:
           USERS: ${{ vars.USERS || github.repository_owner }}
           REPO: ${{ github.repository }}
