@@ -5,51 +5,32 @@ on:
     types: [opened, edited, deleted, closed, reopened, labeled, unlabeled, milestoned, demilestoned]
 
 jobs:
-  checker:
-    runs-on: ubuntu-latest
-    steps:
-      - env:
-          EVENT_CONTEXT: ${{ toJSON(github.event) }}
-          VARS: ${{ toJSON(vars) }}
-          LOGIN: ${{ github.event.sender.login }}
-        run: |
-          echo $GITHUB_REPOSITORY_OWNER
-          echo ${GITHUB_REF##*/}
-          echo "${{ vars.USERS }}"
-          echo "${{ github.event.sender.login }}"
-          echo "${{ github.repository_owner }}"
-          echo $LOGIN
-          echo $VARS
-
-  build:
-    needs: [checker]
+  setup_env:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         node-version: [18.x]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+  build:
+    needs: [setup_env]
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Check Trigger
+      - name: run
         env:
           USERS: ${{ vars.USERS || github.repository_owner }}
-        if: ${{ contains(env.USERS, github.event.sender.login) != true }}
-        run: exit 0
-
-      - name: Next
-        env:
           REPO: ${{ github.repository }}
-        run: echo $REPO
-
-    # - name: Checkout repository
-    #   uses: actions/checkout@v2
-
-    # - name: Set up Node.js
-    #   uses: actions/setup-node@v1
-    #   with:
-    #     node-version: ${{ matrix.node-version }}
-
-    # - name: Install dependencies
-    #   run: npm install
-
-    # - name: Run tests
-    #   run: npm run test
+          BRANCH: ${{ github.ref_name }}
+        if: contains(env.USERS, github.event.sender.login)
+        run: |
+          echo $BRANCH
+          npm install
+          npx acyort pigeon --users $USERS --repo $REPO
