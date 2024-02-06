@@ -32,7 +32,7 @@ jobs:
       - name: Check Trigger
         env:
           USERS: ${{ vars.USERS || github.repository_owner }}
-        if: contains(env.USERS, github.event.sender.login) != true
+        if: ${{ contains(env.USERS, github.event.sender.login) != true }}
         run: exit 0
 
       - name: Next
