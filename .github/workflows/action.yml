@@ -21,12 +21,6 @@ jobs:
           echo $LOGIN
           echo $VARS
 
-      - name: Check Trigger
-        env:
-          USERS: ${{ vars.USERS || github.repository_owner }}
-        if: contains(env.USERS, github.event.sender.login)
-        run: exit 0
-
   build:
     needs: [checker]
     runs-on: ubuntu-latest
@@ -35,16 +29,16 @@ jobs:
         node-version: [18.x]
 
     steps:
+      - name: Check Trigger
+        env:
+          USERS: ${{ vars.USERS || github.repository_owner }}
+        if: contains(env.USERS, github.event.sender.login) != true
+        run: exit 0
+
       - name: Next
         env:
           REPO: ${{ github.repository }}
         run: echo $REPO
-
-      - name: Check Trigger
-        env:
-          USERS: ${{ vars.USERS || github.repository_owner }}
-        if: contains(env.USERS, github.event.sender.login)
-        run: exit 0
 
     # - name: Checkout repository
     #   uses: actions/checkout@v2
