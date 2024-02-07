@@ -26,6 +26,7 @@ jobs:
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
           TIMESTAMP: ${{ github.event.issue.updated_at }}
+          GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: contains(env.USERS, github.event.sender.login)
         run: |
           echo $BRANCH
@@ -33,6 +34,7 @@ jobs:
           npx acyort pigeon --users $USERS --repo $REPO
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git remote set-url origin "https://${{ github.actor }}:$GIT_TOKEN@github.com/$REPO"
           git add .
           git commit -am "updated by github action - $TIMESTAMP"
           git push origin $BRANCH
