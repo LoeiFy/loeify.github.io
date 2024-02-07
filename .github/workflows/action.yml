@@ -25,6 +25,8 @@ jobs:
           USERS: ${{ vars.USERS || github.repository_owner }}
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
+          EMAIL: ${{ github.event.sender.email }}
+          USER: ${{ github.event.sender.login }}
         if: contains(env.USERS, github.event.sender.login)
         run: |
           echo $BRANCH
