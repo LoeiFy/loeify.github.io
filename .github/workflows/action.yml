@@ -28,7 +28,7 @@ jobs:
           TIMESTAMP: ${{ github.event.issue.updated_at }}
         if: contains(env.USERS, github.event.sender.login)
         run: |
-          echo $BRANCH
+          rm -rf docs
           npm install
           npx acyort pigeon --users $USERS --repo $REPO
           git config user.name "${{ github.actor }}"
