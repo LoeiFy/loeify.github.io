@@ -5,7 +5,7 @@ const config = {
   plugins: ['@acyort/pigeon'],
   template: '@acyort/pigeon',
   title: 'Recordum',
-  description: 'lorem ipsum dolor sit amet, consectetur adipiscing elit',
+  description: 'lorem ipsum dolor sit amet',
   public: '/docs',
   menu: {
     archives: '/archives/',
