@@ -1,3 +1,3 @@
-# loeify.github.io
+# LOG
 
-loeify.github.io
+log.0xff.work
