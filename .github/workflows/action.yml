@@ -31,6 +31,7 @@ jobs:
           rm -rf docs
           npm install
           npx acyort pigeon --users $USERS --repo $REPO
+          cd docs && echo log.0xff.work > CNAME && cd ..
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
           git add .
