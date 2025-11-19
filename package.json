@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/LoeiFy/loeify.github.io#readme",
   "devDependencies": {
-    "@acyort/pigeon": "^1.0.4",
+    "@acyort/pigeon": "^1.0.5",
     "acyort": "^4.0.0"
   }
 }

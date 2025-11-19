@@ -4,14 +4,14 @@
 const config = {
   plugins: ['@acyort/pigeon'],
   template: '@acyort/pigeon',
-  title: 'Recordum',
-  description: 'lorem ipsum dolor sit amet',
+  title: '🐦 Pigeon',
+  description: 'something came up, coo coo coo',
   public: '/docs',
   menu: {
     archives: '/archives/',
     about: '/about/',
   },
-  favicon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoBAMAAAB+0KVeAAAAGFBMVEUAAAA7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozsmr7C1AAAAB3RSTlMA8o3HRiCjAZ7XVAAAAFRJREFUKM9jGAUMDE6GwiroYkHi5eWFqqhirOnlQFAWgCLIVA4GCiiCjhBBERRBdYhgEYqgOUSwGEVQHCJYSEgQoZ2QRQgnEXI8wpsEAgQRdKOAAQCvriuz6lBMNwAAAABJRU5ErkJggg==',
+  favicon: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
   timezone: 'Asia/Shanghai',
   language: 'en',
   perpage: 10,
