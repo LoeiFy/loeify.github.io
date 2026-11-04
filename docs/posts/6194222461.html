@@ -49,8 +49,8 @@
     <div>
     
 <div class="markdown-body">
-<blockquote>
-<p>一套在 CI 中无人值守运行的 Sentry 错误处理方案：Agent 每周拉取线上错误、判断是否为代码问题，能修则提 PR，不能修则输出诊断，最后汇总为一个 GitHub Issue 并发送群通知。本文覆盖上报层设计、执行流程、设计取舍与方案边界，文末附可复用的提示词骨架（已脱敏）。</p></blockquote>
+<p>一套在 CI 中无人值守运行的 Sentry 错误处理方案：Agent 每周拉取线上错误、判断是否为代码问题，能修则提 PR，不能修则输出诊断，最后汇总为一个 GitHub Issue 并发送群通知。本文覆盖上报层设计、执行流程、设计取舍与方案边界，文末附可复用的提示词骨架（已脱敏）</p><!-- more -->
+
 <h2>
   <a href="#一、背景与目标" id="一、背景与目标"></a>一、背景与目标
 </h2><p>前端上线后，Sentry 里的错误会持续累积。传统做法是有人定期打开后台逐条 triage——成本高、易拖延，而且大量&quot;非代码问题&quot;（资源加载失败、网络抖动、请求取消）混在真正的缺陷里，人工筛选纯属浪费。</p><p>目标是把这条链路自动化，四条原则：</p><ol>
@@ -192,16 +192,16 @@
 <span>8</span>
 <span>9</span>
 <span>10</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-none">export default function captureWithContext(
-  error: unknown,
-  contexts: Record&lt;string, Record&lt;string, unknown&gt;&gt;
-) {
-  Sentry.withScope((scope) &#x3D;&gt; {
-    Object.entries(contexts).forEach(([name, data]) &#x3D;&gt; scope.setContext(name, data));
-    scope.setLevel(&quot;error&quot;);
-    Sentry.captureException(error);
-  });
-}</pre></td>
+        <td class="code-highlight-code"><pre class="language-js"><span class="token keyword">export</span> <span class="token keyword">default</span> <span class="token keyword">function</span> <span class="token function">captureWithContext</span><span class="token punctuation">(</span>
+  <span class="token parameter"><span class="token literal-property property">error</span><span class="token operator">:</span> unknown<span class="token punctuation">,</span>
+  <span class="token literal-property property">contexts</span><span class="token operator">:</span> Record<span class="token operator">&lt;</span>string<span class="token punctuation">,</span> Record<span class="token operator">&lt;</span>string<span class="token punctuation">,</span> unknown<span class="token operator">>></span></span>
+<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  Sentry<span class="token punctuation">.</span><span class="token function">withScope</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">scope</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    Object<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span>contexts<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">forEach</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>name<span class="token punctuation">,</span> data<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=></span> scope<span class="token punctuation">.</span><span class="token function">setContext</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> data<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    scope<span class="token punctuation">.</span><span class="token function">setLevel</span><span class="token punctuation">(</span><span class="token string">"error"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    Sentry<span class="token punctuation">.</span><span class="token function">captureException</span><span class="token punctuation">(</span>error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -281,23 +281,23 @@ events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</p
 <span>9</span>
 <span>10</span>
 <span>11</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-none">if (!msg?.targetId) {
-  Sentry.captureWithContext(
-    new Error(&quot;msg.targetId missing on notification click&quot;),
-    {
-      target: { ...msg },                                  &#x2F;&#x2F; 出错对象全量
-      missing: { field: &quot;targetId&quot; },                       &#x2F;&#x2F; 缺失字段
-      trigger: { page: &quot;notification&quot;, action: &quot;click&quot; },   &#x2F;&#x2F; 触发上下文
-      request: { traceId },                                 &#x2F;&#x2F; 关联请求
-    }
-  );
-}</pre></td>
+        <td class="code-highlight-code"><pre class="language-js"><span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>msg<span class="token operator">?.</span>targetId<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  Sentry<span class="token punctuation">.</span><span class="token function">captureWithContext</span><span class="token punctuation">(</span>
+    <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">"msg.targetId missing on notification click"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span>
+      <span class="token literal-property property">target</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token operator">...</span>msg <span class="token punctuation">}</span><span class="token punctuation">,</span>                                  <span class="token comment">// 出错对象全量</span>
+      <span class="token literal-property property">missing</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token literal-property property">field</span><span class="token operator">:</span> <span class="token string">"targetId"</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>                       <span class="token comment">// 缺失字段</span>
+      <span class="token literal-property property">trigger</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token literal-property property">page</span><span class="token operator">:</span> <span class="token string">"notification"</span><span class="token punctuation">,</span> <span class="token literal-property property">action</span><span class="token operator">:</span> <span class="token string">"click"</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>   <span class="token comment">// 触发上下文</span>
+      <span class="token literal-property property">request</span><span class="token operator">:</span> <span class="token punctuation">{</span> traceId <span class="token punctuation">}</span><span class="token punctuation">,</span>                                 <span class="token comment">// 关联请求</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre></td>
       </tr>
     </tbody>
   </table>
 </div><p><strong>为什么缺一不可？</strong> 只防护不上报，问题会从&quot;崩溃&quot;退化为&quot;静默失效&quot;——用户没反应，Sentry 里也再无记录，等于亲手掐断线索。埋点要一次带够定位所需数据，避免复现后再补埋点、再等一周。</p><p>三个配套细节：调用封装前必须先读<strong>真实签名</strong>，按直觉写会静默丢上下文；埋点抛描述性 <code>Error</code> 而非裸对象（去重依赖错误文本，打标依赖异常类型）；PR 描述注明是直接修复还是治标（治标须写明根因未确认、已补上报、可疑假设标&quot;待验证&quot;）。</p><p><strong>报告模式（无写操作，输出结构化诊断）</strong>：技术影响级别（白屏 / 操作失效 / 局部报错）、业务影响级别（推测 + 依据，待人工确认）、根因假设 + 依据、建议下一步。让&quot;没修&quot;的条目依然有信息量。</p><h3>
   <a href="#5. 创建汇总 Issue" id="5. 创建汇总 Issue"></a>5. 创建汇总 Issue
-</h3><p>整个任务<strong>唯一</strong>创建的 Issue，标题 <code>Sentry 周报修复总结 - {YYYY-MM-DD}</code>，逐条列出：issue 名称 + Sentry 链接、分类、代码问题的&quot;已解决（方案 + PR 链接）&quot;或&quot;未解决（原因 + 建议）&quot;、非代码问题的可能原因 + 建议；合并项只列一条并注明 N 个关联 issue。</p><img width="1280" height="1202" alt="Image" src="https://github.com/user-attachments/assets/9ceea86e-6512-4524-bae5-0681279ff11d" />
+</h3><p>整个任务<strong>唯一</strong>创建的 Issue，标题 <code>Sentry 周报修复总结 - {YYYY-MM-DD}</code>，逐条列出：issue 名称 + Sentry 链接、分类、代码问题的&quot;已解决（方案 + PR 链接）&quot;或&quot;未解决（原因 + 建议）&quot;、非代码问题的可能原因 + 建议；合并项只列一条并注明 N 个关联 issue。</p><img alt="Image" src="https://github.com/user-attachments/assets/9ceea86e-6512-4524-bae5-0681279ff11d" />
 
 <h3>
   <a href="#6. 飞书群通知" id="6. 飞书群通知"></a>6. 飞书群通知
@@ -325,7 +325,7 @@ events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</p
 <td>&quot;本周未返回需要处理的错误&quot;</td>
 </tr>
 </tbody></table>
-<p>两条注意：Issue URL 必须取自创建 Issue 的 API 返回，不可拼造；飞书发送失败不影响已完成的 GitHub 操作，无需回滚。</p><img width="1280" height="491" alt="Image" src="https://github.com/user-attachments/assets/05818fb1-d603-4c66-84c9-537a66b3da9e" />
+<p>两条注意：Issue URL 必须取自创建 Issue 的 API 返回，不可拼造；飞书发送失败不影响已完成的 GitHub 操作，无需回滚。</p><img alt="Image" src="https://github.com/user-attachments/assets/05818fb1-d603-4c66-84c9-537a66b3da9e" />
 
 <h2>
   <a href="#五、关键设计取舍" id="五、关键设计取舍"></a>五、关键设计取舍
