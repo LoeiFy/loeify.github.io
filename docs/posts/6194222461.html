@@ -49,18 +49,15 @@
     <div>
     
 <div class="markdown-body">
-<p>一套在 CI 中无人值守运行的 Sentry 错误处理方案：Agent 每周拉取线上错误、判断是否为代码问题，能修则提 PR，不能修则输出诊断，最后汇总为一个 GitHub Issue 并发送群通知。本文覆盖上报层设计、执行流程、设计取舍与方案边界，文末附可复用的提示词骨架（已脱敏）</p><!-- more -->
+<p>上线之后 Sentry 里的错误一直在涨，真正去看的人却越来越少。</p><!-- more -->
 
-<h2>
-  <a href="#一、背景与目标" id="一、背景与目标"></a>一、背景与目标
-</h2><p>前端上线后，Sentry 里的错误会持续累积。传统做法是有人定期打开后台逐条 triage——成本高、易拖延，而且大量&quot;非代码问题&quot;（资源加载失败、网络抖动、请求取消）混在真正的缺陷里，人工筛选纯属浪费。</p><p>目标是把这条链路自动化，四条原则：</p><ol>
-<li><p><strong>每周自动汇总</strong>：拉取最近 7 天的 production 错误，生成结构化周报；</p></li>
-<li><p><strong>能修则修</strong>：定位明确、改动可控的问题，自动提交最小修复 PR；</p></li>
-<li><p><strong>PR 不合并</strong>：只创建，人工 review 是终点；</p></li>
-<li><p><strong>通知闭环</strong>：无论结果如何都发群通知，&quot;本周必有回音&quot;。</p></li>
-</ol>
-<p>方案有两半：CI 里的流水线（拉取、分类、修复）和页面里的自建上报层（<code>src/utils/sentry</code>）。错误先被上报得干净，Agent 才能挑得准——两者是配套关系。</p><h2>
-  <a href="#二、整体流程" id="二、整体流程"></a>二、整体流程
+<p>我们之前是每周排一个人翻后台，一条条点开判断是不是代码问题。这件事的麻烦不在于占多少工时，而在于它总能往后拖；而且列表里大量条目根本不是代码问题——图片 404、网络抖动、用户主动取消的请求，和真正的空指针崩溃混在一起，人工筛一遍大半是在做无用功。</p><p>后来我们把这段流程交给了 CI 里的一个 Agent。它每周跑一次，拉最近 7 天的 production 错误，能定位的直接提 PR，定位不了的写诊断，无论结果如何最后都在飞书群里发一条消息。</p><p>约束很明确：</p><ul>
+<li>只拉 production，只覆盖最近 7 天；</li>
+<li>PR 只创建不合并，人工 review 是终点；</li>
+<li>每周必须有一条群消息，内容可以是&quot;本周没有需要处理的错误&quot;。</li>
+</ul>
+<p>方案由两块组成：CI 里的流水线，以及页面里的自建上报层（<code>src/utils/sentry</code>）。顺序是先有干净的上报，Agent 才挑得准，所以下面先讲上报层，再讲流水线。</p><h2>
+  <a href="#一、整体流程" id="一、整体流程"></a>一、整体流程
 </h2><div class="code-highlight">
   <table>
     <tbody>
@@ -72,20 +69,19 @@
 <span>5</span>
 <span>6</span>
 <span>7</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-none">定时触发（每周）
-  → 1. 拉取 Sentry 近 7 天 production 错误（errorType:[unhandledError,error]）
-  → 2. 分类：代码问题 &#x2F; 非代码问题
-  → 3. 去重：同一根因合并为一个修复单元
-  → 4. 逐条处理：修复模式 → 独立分支 + PR ｜ 报告模式 → 仅记录诊断
-  → 5. 创建唯一一个汇总 GitHub Issue
-  → 6. 飞书群卡片通知（含汇总 Issue 链接）</pre></td>
+        <td class="code-highlight-code"><pre class="language-none">每周定时触发
+  → 拉取 Sentry 近 7 天 production 错误（errorType:[unhandledError,error]）
+  → 分类：代码问题 &#x2F; 非代码问题
+  → 去重：同一根因合并成一个修复单元
+  → 逐条处理：能修的分支 + PR，不能修的只留诊断
+  → 创建当周唯一一个汇总 GitHub Issue
+  → 飞书群卡片通知，附汇总 Issue 链接</pre></td>
       </tr>
     </tbody>
   </table>
-</div><p><strong>输入</strong>只有两个凭据：<code>SENTRY_TOKEN</code>（只读，拉 issue 与堆栈）、<code>GITHUB_TOKEN</code>（克隆、推分支、建 PR/Issue）。
-<strong>输出</strong>三类：修复 PR、汇总 Issue、飞书通知。三者联动：PR 描述标注 Sentry issue ID，汇总 Issue 汇集所有条目与 PR 链接，飞书通知带汇总 Issue 的真实 URL。</p><h2>
-  <a href="#三、上报层：流水线的地基" id="三、上报层：流水线的地基"></a>三、上报层：流水线的地基
-</h2><p>项目没有裸用 <code>@sentry/browser</code>，而是在 <code>src/utils/sentry</code> 封装了约 10 个模块，解决三件事：<strong>怎么收、哪些不报、怎么分级打标</strong>。</p><table>
+</div><p>输入只有两个凭据：<code>SENTRY_TOKEN</code>（只读，用来查 issue 和堆栈）和 <code>GITHUB_TOKEN</code>（克隆、推分支、建 PR 和 Issue）。输出三类：修复 PR、汇总 Issue、群通知。三者之间有引用关系——PR 描述里带 Sentry issue ID，汇总 Issue 列出所有条目和对应 PR，群消息里的链接取自创建 Issue 那一步的返回值。</p><h2>
+  <a href="#二、上报层" id="二、上报层"></a>二、上报层
+</h2><p>项目没有裸用 <code>@sentry/browser</code>，而是在 <code>src/utils/sentry</code> 下包了十个左右模块。要解决的问题就三个：错误怎么收、哪些不报、怎么分级打标。</p><table>
 <thead>
 <tr>
 <th>模块</th>
@@ -94,23 +90,23 @@
 </thead>
 <tbody><tr>
 <td><code>index.ts</code></td>
-<td><code>init</code> 入口：接管全局处理器、串联过滤链、补报初始化前缓存的事件</td>
+<td><code>init</code> 入口，接管全局处理器、串起过滤链、补报初始化前缓存的事件</td>
 </tr>
 <tr>
 <td><code>config.ts</code></td>
-<td><code>ignoreErrors</code> 忽略规则、API 忽略状态码、<code>whiteScreenChecker</code></td>
+<td><code>ignoreErrors</code> 规则、API 忽略状态码、<code>whiteScreenChecker</code></td>
 </tr>
 <tr>
 <td><code>error.ts</code></td>
-<td><code>error</code> 事件：资源错误 / JS 错误分流 + 白屏感知分级</td>
+<td><code>error</code> 事件，资源错误与 JS 错误分流，白屏感知分级</td>
 </tr>
 <tr>
 <td><code>unhandledrejection.ts</code></td>
-<td>Promise rejection 处理，统一打 <code>unhandledError</code> 标签</td>
+<td>Promise rejection，统一打 <code>unhandledError</code></td>
 </tr>
 <tr>
 <td><code>api.ts</code></td>
-<td>HTTP 失败请求：<code>apiError</code> 标签，按状态码分级</td>
+<td>HTTP 失败请求，打 <code>apiError</code>，按状态码分级</td>
 </tr>
 <tr>
 <td><code>filter.ts</code></td>
@@ -118,11 +114,11 @@
 </tr>
 <tr>
 <td><code>context.ts</code></td>
-<td><code>captureWithContext</code>：带上下文块的手动上报</td>
+<td><code>captureWithContext</code>，带上下文块的手动上报</td>
 </tr>
 <tr>
 <td><code>biz.ts</code></td>
-<td><code>captureBizException</code>：业务兜底错误上报</td>
+<td><code>captureBizException</code>，业务兜底错误上报</td>
 </tr>
 <tr>
 <td><code>freeze.ts</code></td>
@@ -130,9 +126,9 @@
 </tr>
 </tbody></table>
 <h3>
-  <a href="#1. 接管全局处理器，统一收口" id="1. 接管全局处理器，统一收口"></a>1. 接管全局处理器，统一收口
-</h3><p><code>init</code> 里过滤掉 Sentry 内置的 <code>GlobalHandlers</code>，改用 <code>window.sentry_captureError</code> / <code>sentry_captureUnhandled</code> 自行捕获。好处是<strong>所有错误入 Sentry 前都经过同一套分级和打标</strong>，顺带解决 SDK 初始化前丢错误的问题——早期事件先缓存在 <code>window.sentry_*</code> 数组，<code>init</code> 后统一补报。</p><h3>
-  <a href="#2. <code>errorType</code> 标签体系：为流水线而设计" id="2. <code>errorType</code> 标签体系：为流水线而设计"></a>2. <code>errorType</code> 标签体系：为流水线而设计
+  <a href="#接管全局处理器" id="接管全局处理器"></a>接管全局处理器
+</h3><p><code>init</code> 里把 Sentry 内置的 <code>GlobalHandlers</code> 从 integrations 中去掉，改用 <code>window.sentry_captureError</code> 和 <code>sentry_captureUnhandled</code> 自己接管。这样所有错误在进 Sentry 之前都会走同一套分级和打标逻辑。顺带解决了一个老问题：SDK 初始化之前发生的错误会丢，现在先缓存在 <code>window.sentry_*</code> 数组里，<code>init</code> 之后统一补报。</p><h3>
+  <a href="#errorType 标签" id="errorType 标签"></a>errorType 标签
 </h3><table>
 <thead>
 <tr>
@@ -148,7 +144,7 @@
 </tr>
 <tr>
 <td><code>unhandledError</code></td>
-<td>未处理 Promise rejection</td>
+<td>未处理的 Promise rejection</td>
 <td><code>errorName</code></td>
 </tr>
 <tr>
@@ -167,18 +163,23 @@
 <td><code>apiPath</code></td>
 </tr>
 </tbody></table>
-<p>因此查询条件 <code>errorType:[unhandledError,error]</code> 天然排除资源、API 和业务错误。这不是巧合：<strong>打标在上游就为下游分流做好了准备</strong>，分类步骤里的&quot;非代码问题&quot;有相当一部分在这里已被挡掉或降级。</p><h3>
-  <a href="#3. 白屏感知分级" id="3. 白屏感知分级"></a>3. 白屏感知分级
-</h3><p>同一个 JS 错误，白屏与非白屏下严重级别完全不同：<code>whiteScreenChecker()</code>（检查 <code>#root</code> 是否为空）为真时，动态导入失败降为 <code>warning</code>（多为发布切换期瞬态问题），其余标 <code>fatal</code>；非白屏时按错误性质给 <code>error</code> / <code>warning</code>。资源错误（<code>event.error === undefined</code>）统一降级并附 <code>tagName</code> / <code>src</code>，不进错误主线。</p><h3>
-  <a href="#4. 发送前的过滤链" id="4. 发送前的过滤链"></a>4. 发送前的过滤链
-</h3><p><code>beforeSend</code> 串起三层闸门：</p><ul>
-<li><p><strong><code>config.ignoreErrors</code></strong>：已知噪音直接不报——<code>ResizeObserver loop</code>、浏览器插件（<code>extension://</code>）、<code>Script error</code>、请求取消（<code>CanceledError</code> / <code>ECONNABORTED</code> / <code>timeout of xms exceeded</code>）；</p></li>
-<li><p><strong><code>api.ts</code></strong>：识别 HTTP 失败（<code>auto.http.client.xhr/fetch</code>），401 丢弃，5xx 保持 error，4xx 降为 warning；</p></li>
-<li><p><strong><code>filter.ts</code></strong>：同页面内 traceId + 错误内容 + URL 完全一致只报一次，防刷屏。</p></li>
+<p>流水线的查询条件写的是 <code>errorType:[unhandledError,error]</code>，资源、API、业务错误因此天然被排除在外。我们当初做这套标签只是为了在后台里区分错误来源，后来发现它刚好成了两个系统的接口约定：标签在上报时就打好了，查询端才能写得这么简单，分类那一步的负担也轻了不少。</p><h3>
+  <a href="#白屏分级" id="白屏分级"></a>白屏分级
+</h3><p>同一个 JS 错误，白屏和非白屏下的严重程度完全不同。<code>whiteScreenChecker()</code> 检查 <code>#root</code> 是否为空：</p><ul>
+<li>白屏时，动态导入失败降到 <code>warning</code>（大多是发布切换时的瞬态问题），其余标 <code>fatal</code>；</li>
+<li>非白屏时，按错误性质给 <code>error</code> 或 <code>warning</code>；</li>
+<li>资源错误（<code>event.error === undefined</code>）统一降级，附 <code>tagName</code> 和 <code>src</code>，不进错误主线。</li>
 </ul>
-<p>噪音在客户端就被拦掉，服务端拉到的基本都是&quot;值得看&quot;的事件，错误量因此可控。</p><h3>
-  <a href="#5. <code>captureWithContext</code>：埋点的标准入口" id="5. <code>captureWithContext</code>：埋点的标准入口"></a>5. <code>captureWithContext</code>：埋点的标准入口
-</h3><p>真实签名与直觉不同：第二个参数不是扁平对象，而是&quot;上下文块名 → 数据&quot;的映射。</p><div class="code-highlight">
+<h3>
+  <a href="#beforeSend 里的三层过滤" id="beforeSend 里的三层过滤"></a>beforeSend 里的三层过滤
+</h3><ul>
+<li><code>config.ignoreErrors</code>：已知噪音直接不报。<code>ResizeObserver loop</code>、浏览器插件（<code>extension://</code>）、<code>Script error</code>、请求取消（<code>CanceledError</code> / <code>ECONNABORTED</code> / <code>timeout of xms exceeded</code>）都在这个列表里。</li>
+<li><code>api.ts</code>：识别 HTTP 失败（<code>auto.http.client.xhr/fetch</code>）。401 丢掉，5xx 保持 <code>error</code>，4xx 降为 <code>warning</code>。</li>
+<li><code>filter.ts</code>：同页面内 traceId、错误内容、URL 三者完全一致只报一次，防止同一错误把列表刷屏。</li>
+</ul>
+<p>噪音在客户端就拦掉了，服务端拉到的事件基本都是值得看的，量也可控。</p><h3>
+  <a href="#captureWithContext 的签名" id="captureWithContext 的签名"></a>captureWithContext 的签名
+</h3><p>这个封装的第二个参数不是扁平对象，而是&quot;上下文块名 → 数据&quot;的映射，跟我们第一版按直觉写的不一样：</p><div class="code-highlight">
   <table>
     <tbody>
       <tr>
@@ -192,25 +193,25 @@
 <span>8</span>
 <span>9</span>
 <span>10</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-js"><span class="token keyword">export</span> <span class="token keyword">default</span> <span class="token keyword">function</span> <span class="token function">captureWithContext</span><span class="token punctuation">(</span>
-  <span class="token parameter"><span class="token literal-property property">error</span><span class="token operator">:</span> unknown<span class="token punctuation">,</span>
-  <span class="token literal-property property">contexts</span><span class="token operator">:</span> Record<span class="token operator">&lt;</span>string<span class="token punctuation">,</span> Record<span class="token operator">&lt;</span>string<span class="token punctuation">,</span> unknown<span class="token operator">>></span></span>
-<span class="token punctuation">)</span> <span class="token punctuation">{</span>
-  Sentry<span class="token punctuation">.</span><span class="token function">withScope</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">scope</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
-    Object<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span>contexts<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">forEach</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>name<span class="token punctuation">,</span> data<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=></span> scope<span class="token punctuation">.</span><span class="token function">setContext</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> data<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    scope<span class="token punctuation">.</span><span class="token function">setLevel</span><span class="token punctuation">(</span><span class="token string">"error"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    Sentry<span class="token punctuation">.</span><span class="token function">captureException</span><span class="token punctuation">(</span>error<span class="token punctuation">)</span><span class="token punctuation">;</span>
-  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-<span class="token punctuation">}</span></pre></td>
+        <td class="code-highlight-code"><pre class="language-none">export default function captureWithContext(
+  error: unknown,
+  contexts: Record&lt;string, Record&lt;string, unknown&gt;&gt;
+) {
+  Sentry.withScope((scope) &#x3D;&gt; {
+    Object.entries(contexts).forEach(([name, data]) &#x3D;&gt; scope.setContext(name, data));
+    scope.setLevel(&quot;error&quot;);
+    Sentry.captureException(error);
+  });
+}</pre></td>
       </tr>
     </tbody>
   </table>
-</div><p>所以在 Sentry 后台，各块是独立 context，比扁平 extras 更可读、更好检索。另一个封装 <code>captureBizException</code> 只在接口返回兜底 code（-1）时上报，避免业务异常码刷爆列表。</p><h3>
-  <a href="#6. Worker 心跳：主线程卡死也能上报" id="6. Worker 心跳：主线程卡死也能上报"></a>6. Worker 心跳：主线程卡死也能上报
-</h3><p>普通上报有盲区：主线程 freeze 时 SDK 自身也发不出事件。<code>freeze.ts</code> 启动 Blob Worker，与主线程每 5 秒互发心跳；超时即判定 <code>dead</code>，由 Worker 用 <code>fetch</code> + <code>keepalive: true</code> 直接构造 <code>UI Freeze</code> 事件（fatal），附内存占用、页面 URL 与最后活跃时间。它不进入流水线查询，但在 Sentry 后台是独立的 fatal 信号。</p><h2>
-  <a href="#四、流水线执行详解" id="四、流水线执行详解"></a>四、流水线执行详解
+</div><p>结果是 Sentry 后台里每块数据是独立的 context，比塞进 extras 可读，也方便按字段检索。另一个封装 <code>captureBizException</code> 只在接口返回兜底 code（-1）时上报，避免业务异常码占满列表。</p><h3>
+  <a href="#Worker 心跳" id="Worker 心跳"></a>Worker 心跳
+</h3><p>普通上报有个盲区：主线程卡死的时候，SDK 自己也发不出事件。<code>freeze.ts</code> 起了一个 Blob Worker，和主线程每 5 秒互发一次心跳，超时就判定 <code>dead</code>，由 Worker 用 <code>fetch</code> 加 <code>keepalive: true</code> 直接构造 <code>UI Freeze</code> 事件（fatal），带上内存占用、页面 URL 和最后活跃时间。这类事件不进流水线查询，但在后台是一个独立的信号。</p><h2>
+  <a href="#三、流水线" id="三、流水线"></a>三、流水线
 </h2><h3>
-  <a href="#1. 拉取本周错误" id="1. 拉取本周错误"></a>1. 拉取本周错误
+  <a href="#拉取" id="拉取"></a>拉取
 </h3><div class="code-highlight">
   <table>
     <tbody>
@@ -226,17 +227,23 @@
       </tr>
     </tbody>
   </table>
-</div><p>关注字段：<code>id</code>（关联堆栈与 PR）、<code>metadata.value</code>（分类核心依据）、<code>permalink</code>（写入 Issue 与 PR）、<code>count</code> / <code>level</code>（影响面与优先级）。</p><p><strong>异常路径先于主流程定义</strong>：接口非 200 → 不建任何 GitHub 资源，直接发红色卡片（含状态码与错误信息）；返回空数组 → 不发 PR、不建 Issue，发蓝色卡片&quot;本周无需要处理的错误&quot;。</p><h3>
-  <a href="#2. 判断是否为代码问题" id="2. 判断是否为代码问题"></a>2. 判断是否为代码问题
-</h3><p>标准刻意<strong>机械化</strong>，避免 Agent 自由发挥。依据只有一条：<strong>能否从 <strong><strong><code>metadata.value</code></strong></strong> 提取出具体异常类型或代码行为描述</strong>。</p><ul>
-<li>非代码问题：网络 / 资源加载失败、无有效堆栈。典型如 <code>Object captured as exception with keys: ...</code>、<code>Network Error</code>、<code>Unable to preload CSS for ...</code>、<code>Importing a module script failed.</code>；</li>
-<li>代码问题：包含明确异常类型和可定位描述，如 <code>TypeError: Cannot read properties of null (reading &#39;someField&#39;)</code>。</li>
+</div><p>要用的字段不多：<code>id</code>（关联堆栈和 PR）、<code>metadata.value</code>（分类的核心依据）、<code>permalink</code>（写进 Issue 和 PR）、<code>count</code> 和 <code>level</code>（影响面与优先级）。</p><p>异常路径先于主流程定好。接口返回非 200，不建任何 GitHub 资源，直接发一张红卡片，写明状态码和错误信息；返回空数组，不发 PR 也不建 Issue，发蓝卡片说本周没有需要处理的错误。无人值守的系统里，最怕的不是失败，而是失败之后行为没有定义。</p><h3>
+  <a href="#判断是不是代码问题" id="判断是不是代码问题"></a>判断是不是代码问题
+</h3><p>标准我们刻意写得机械，不让 Agent 自由发挥。依据只有一条：能不能从 <code>metadata.value</code> 里提取出具体异常类型或代码行为描述。</p><ul>
+<li>非代码问题：网络或资源加载失败、没有有效堆栈。典型文本是 <code>Object captured as exception with keys: ...</code>、<code>Network Error</code>、<code>Unable to preload CSS for ...</code>、<code>Importing a module script failed.</code>。</li>
+<li>代码问题：有明确异常类型，描述能定位到代码位置。比如 <code>TypeError: Cannot read properties of null (reading &#39;someField&#39;)</code>。</li>
 </ul>
-<p>非代码问题<strong>不丢弃</strong>，作为条目记入汇总 Issue，附可能原因与排查建议。资源类错误根因通常在发布流程或 CDN 缓存，不属代码修复范畴。</p><h3>
-  <a href="#3. 合并重复 issue" id="3. 合并重复 issue"></a>3. 合并重复 issue
-</h3><p>同一缺陷常产生多个 issue（行号、调用路径、release 不同）。满足任一即视为同根因：错误文本高度相似且指向同一对象；堆栈文件与函数相同、仅行号/路径不同；同一模块相近位置；信息与位置相同、仅 release / environment 不同。</p><p>合并规则：同根因只建<strong>一个 PR</strong>（描述列全部 issue ID 与链接）；汇总中并为一条并注明&quot;对应 N 个 Sentry issue&quot;；<strong>不确定时不合并</strong>。</p><p>保守是有意为之：宁可多修一个，不要错并一个——错误合并会让一个 PR 同时改两处无关代码，违背最小单点修复。</p><h3>
-  <a href="#4. 分析与修复" id="4. 分析与修复"></a>4. 分析与修复
-</h3><p>逐个问题拉取最新事件堆栈：</p><div class="code-highlight">
+<p>非代码问题不丢，作为条目记进汇总 Issue，附上可能原因和排查建议。资源类错误的根因多半在发布流程或 CDN 缓存，本来也不该由代码修复来管。</p><h3>
+  <a href="#合并重复 issue" id="合并重复 issue"></a>合并重复 issue
+</h3><p>同一个缺陷经常散成多个 issue，区别只在行号、调用路径或 release。满足任一条就算同根因：</p><ul>
+<li>错误文本高度相似，且指向同一个对象；</li>
+<li>堆栈文件与函数相同，只有行号或路径不同；</li>
+<li>同一个模块的相近位置；</li>
+<li>信息和位置都相同，只有 release 或 environment 不同。</li>
+</ul>
+<p>合并之后，同根因只建一个 PR，描述里列全部 issue ID 和链接；汇总里并成一条，注明&quot;对应 N 个 Sentry issue&quot;。拿不准的时候不合并。</p><p>宁可多修一个，也不错并一个。合错了的后果是一个 PR 同时改两处无关代码，既违背最小单点修复，也没法单独回滚。</p><h3>
+  <a href="#分析与修复" id="分析与修复"></a>分析与修复
+</h3><p>逐条拉最新事件的堆栈：</p><div class="code-highlight">
   <table>
     <tbody>
       <tr>
@@ -244,15 +251,12 @@
 <span>2</span>
 <span>3</span></pre></td>
         <td class="code-highlight-code"><pre class="language-none">curl -H &quot;Authorization: Bearer ${SENTRY_TOKEN}&quot; \
-  &quot;https:&#x2F;&#x2F;sentry.io&#x2F;api&#x2F;0&#x2F;organizations&#x2F;&lt;org&gt;&#x2F;issues&#x2F;&lt;issue-id&gt;&#x2F;\
-events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</pre></td>
+  &quot;https:&#x2F;&#x2F;sentry.io&#x2F;api&#x2F;0&#x2F;organizations&#x2F;&lt;org&gt;&#x2F;issues&#x2F;&lt;issue-id&gt;\
+&#x2F;events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</pre></td>
       </tr>
     </tbody>
   </table>
-</div><p>先过<strong>修改上限硬闸门</strong>，再选模式。</p><p><strong>硬闸门（任一命中即转报告模式）</strong>：涉及文件 &gt; 2；跨 2 个以上不相关模块；候选修改位置 &gt; 5 处；根因涉及业务逻辑（而非取值路径、空值保护这类机械错误）。同时限定搜索范围：只查堆栈中出现过的项目内文件与函数，忽略框架帧，调用链最多追一层——防止 Agent 在代码库里&quot;漫游&quot;。</p><p><strong>模式二选一：根因能否从代码本身确定？</strong></p><ul>
-<li>能确定（取值路径写错、缺空值判断）→ <strong>直接修复，不加埋点</strong>。例如路由 state 导致的 crash，从代码即可确认根因：</li>
-</ul>
-<div class="code-highlight">
+</div><p>动手之前先过修改上限，命中任一条就转报告模式：涉及文件超过 2 个；跨 2 个以上不相关模块；候选修改位置超过 5 处；根因涉及业务逻辑，而不是取值路径、空值保护这类机械错误。</p><p>搜索范围也一并限死：只查堆栈里出现过的项目内文件和函数，忽略框架帧，调用链最多追一层。不加这条，Agent 很容易在代码库里到处逛，最后交上来一个看不出因果的 diff。</p><p>接下来按根因能不能从代码本身确定来分两种模式。</p><p>能确定的时候直接修，不额外加埋点。比如路由 state 导致的 crash，看代码就能确认：</p><div class="code-highlight">
   <table>
     <tbody>
       <tr>
@@ -263,10 +267,7 @@ events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</p
       </tr>
     </tbody>
   </table>
-</div><ul>
-<li>不能确定（字段来自接口、运行时数据无法静态确认）→ <strong>治标 + 埋点成对做</strong>：</li>
-</ul>
-<div class="code-highlight">
+</div><p>确定不了的时候——通常字段来自接口，运行时数据静态看不出来——防护和埋点要一起做：</p><div class="code-highlight">
   <table>
     <tbody>
       <tr>
@@ -295,12 +296,12 @@ events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</p
       </tr>
     </tbody>
   </table>
-</div><p><strong>为什么缺一不可？</strong> 只防护不上报，问题会从&quot;崩溃&quot;退化为&quot;静默失效&quot;——用户没反应，Sentry 里也再无记录，等于亲手掐断线索。埋点要一次带够定位所需数据，避免复现后再补埋点、再等一周。</p><p>三个配套细节：调用封装前必须先读<strong>真实签名</strong>，按直觉写会静默丢上下文；埋点抛描述性 <code>Error</code> 而非裸对象（去重依赖错误文本，打标依赖异常类型）；PR 描述注明是直接修复还是治标（治标须写明根因未确认、已补上报、可疑假设标&quot;待验证&quot;）。</p><p><strong>报告模式（无写操作，输出结构化诊断）</strong>：技术影响级别（白屏 / 操作失效 / 局部报错）、业务影响级别（推测 + 依据，待人工确认）、根因假设 + 依据、建议下一步。让&quot;没修&quot;的条目依然有信息量。</p><h3>
-  <a href="#5. 创建汇总 Issue" id="5. 创建汇总 Issue"></a>5. 创建汇总 Issue
-</h3><p>整个任务<strong>唯一</strong>创建的 Issue，标题 <code>Sentry 周报修复总结 - {YYYY-MM-DD}</code>，逐条列出：issue 名称 + Sentry 链接、分类、代码问题的&quot;已解决（方案 + PR 链接）&quot;或&quot;未解决（原因 + 建议）&quot;、非代码问题的可能原因 + 建议；合并项只列一条并注明 N 个关联 issue。</p><img alt="Image" src="https://github.com/user-attachments/assets/9ceea86e-6512-4524-bae5-0681279ff11d" />
+</div><p>只防护不上报的坏处我们吃过一次：崩溃变成了静默失效，用户点了没反应，Sentry 里也没有任何记录，线索是自己掐断的。所以这两件事强制配对。埋点一次要把定位需要的数据带够，否则复现之后再补埋点，又得等一周。</p><p>三个容易踩的细节：调封装之前先读真实签名，按直觉写会静默丢上下文；埋点抛描述性的 <code>Error</code> 实例而不是裸对象，去重依赖错误文本，打标依赖异常类型；PR 描述写清是直接修复还是治标，治标的要注明根因未确认、已补上报、可疑假设标&quot;待验证&quot;。</p><p>报告模式不调用任何写操作，输出固定几项：技术影响级别（白屏 / 操作失效 / 局部报错）、业务影响级别（推测加依据，待人工确认）、根因假设和依据、建议的下一步。这样没修的条目也有信息量，不至于变成一句&quot;无法自动修复&quot;。</p><h3>
+  <a href="#汇总 Issue" id="汇总 Issue"></a>汇总 Issue
+</h3><p>整个任务只创建这一个 Issue，标题是 <code>Sentry 周报修复总结 - {YYYY-MM-DD}</code>。逐条列：issue 名称和 Sentry 链接、分类、代码问题的&quot;已解决（方案 + PR 链接）&quot;或&quot;未解决（原因 + 建议）&quot;、非代码问题的可能原因和建议。合并过的条目只列一条，注明关联了几个 issue。</p><img alt="汇总 Issue 示例" src="https://github.com/user-attachments/assets/9ceea86e-6512-4524-bae5-0681279ff11d" />
 
 <h3>
-  <a href="#6. 飞书群通知" id="6. 飞书群通知"></a>6. 飞书群通知
+  <a href="#群通知" id="群通知"></a>群通知
 </h3><table>
 <thead>
 <tr>
@@ -310,25 +311,25 @@ events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</p
 </tr>
 </thead>
 <tbody><tr>
-<td>A 正常完成</td>
-<td>有未解决 orange / 全解决 green</td>
+<td>正常完成</td>
+<td>有未解决 orange，全解决 green</td>
 <td>处理统计 + &quot;查看汇总 Issue&quot;按钮</td>
 </tr>
 <tr>
-<td>B 接口失败</td>
+<td>接口失败</td>
 <td>red</td>
 <td>状态码 + 错误信息</td>
 </tr>
 <tr>
-<td>C 无 issue</td>
+<td>无 issue</td>
 <td>blue</td>
 <td>&quot;本周未返回需要处理的错误&quot;</td>
 </tr>
 </tbody></table>
-<p>两条注意：Issue URL 必须取自创建 Issue 的 API 返回，不可拼造；飞书发送失败不影响已完成的 GitHub 操作，无需回滚。</p><img alt="Image" src="https://github.com/user-attachments/assets/05818fb1-d603-4c66-84c9-537a66b3da9e" />
+<p>两个细节：按钮的 URL 必须取自创建 Issue 的接口返回，不能自己拼；飞书发送失败不影响已经完成的 GitHub 操作，不需要回滚。</p><img alt="飞书通知示例" src="https://github.com/user-attachments/assets/05818fb1-d603-4c66-84c9-537a66b3da9e" />
 
 <h2>
-  <a href="#五、关键设计取舍" id="五、关键设计取舍"></a>五、关键设计取舍
+  <a href="#四、几个设计取舍" id="四、几个设计取舍"></a>四、几个设计取舍
 </h2><table>
 <thead>
 <tr>
@@ -338,50 +339,50 @@ events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</p
 </thead>
 <tbody><tr>
 <td>自建上报层打 <code>errorType</code> 标签</td>
-<td>原生 Sentry 只有裸事件，各类错误混在一起。标签体系是两个系统之间的契约，让查询精确、分类有底</td>
+<td>原生 Sentry 只有裸事件，各类错误混在一起。有了标签，查询精确，分类也有据可依</td>
 </tr>
 <tr>
 <td>判断标准全部机械化</td>
-<td>看 <code>metadata.value</code>、看四条可枚举的去重规则、看根因能否静态确定——可机械执行就没有&quot;发挥失误&quot;的空间。凡需主观判断（如业务影响）一律标&quot;推测 + 依据，待人工确认&quot;</td>
+<td>看 <code>metadata.value</code>，看四条可枚举的去重规则，看根因能否静态确定。能机械执行的地方就没有发挥失误的空间；凡是要主观判断的（比如业务影响）一律写&quot;推测 + 依据，待人工确认&quot;</td>
 </tr>
 <tr>
-<td>修改上限硬闸门</td>
-<td>自动修复的价值集中在&quot;单点、机械、可静态验证&quot;的错误（典型是空值保护）。改动面一大，静态置信度骤降，review 成本反超收益，宁可漏修不可错修</td>
+<td>修改上限的硬闸门</td>
+<td>自动修复的价值集中在单点、机械、可静态验证的错误，典型就是空值保护。改动面一大，静态置信度掉得很快，review 成本反超收益，宁可漏修不可错修</td>
 </tr>
 <tr>
-<td>防护 + 埋点成对</td>
-<td>最易被忽略也最关键：只防护会让问题从监控里消失而依然存在。强制成对保证治标不丢线索</td>
+<td>防护与埋点成对</td>
+<td>只防护会让问题从监控里消失但依然存在，强制成对是为了治标不丢线索</td>
 </tr>
 <tr>
 <td>单 issue 单分支单 PR</td>
-<td>混合修复一旦某处有问题会拖累整体合并，也无法单独 revert</td>
+<td>混合修复里只要有一处有问题就拖累整体合并，也没法单独 revert</td>
 </tr>
 <tr>
 <td>PR 永不自动合并</td>
-<td>自动合并省几分钟，赌的是线上稳定性。涉及公共函数 / 导出方法时在描述里标注&quot;可能影响其他调用方，需人工确认&quot;</td>
+<td>自动合并省几分钟，赌的是线上稳定性。涉及公共函数或导出方法时，描述里标&quot;可能影响其他调用方，需人工确认&quot;</td>
 </tr>
 <tr>
 <td>异常路径先定义</td>
-<td>无人值守系统最怕的不是失败，而是失败后行为未定义</td>
+<td>无人值守最怕的不是失败，是失败后行为未定义</td>
 </tr>
 </tbody></table>
 <h2>
-  <a href="#六、收益与代价" id="六、收益与代价"></a>六、收益与代价
-</h2><p><strong>收益</strong>：错误处理周期从&quot;数周&quot;压缩到&quot;一周内&quot;（fatal 可单独提高频率）；triage 这类低价值劳动完全自动化；每个修复有 Sentry issue ↔ PR ↔ 汇总 Issue 的完整引用链；每周必有回音，&quot;沉默&quot;本身成为需要警惕的信号；不合并、单点提交、硬闸门、报告模式兜底，每步都有刹车。</p><p><strong>代价与边界</strong>：</p><ol>
-<li><p><strong>单点修复 ≠ 根治</strong>：反复出现、影响面大的问题往往卡在业务逻辑或架构层，恰是 Agent 修不了只能报告的部分；</p></li>
-<li><p><strong>治标会累积</strong>：埋点上报后若无人跟进验证，防护代码长期留存，埋点变成新噪音；</p></li>
-<li><p><strong>启发式会误判</strong>：文本相似度、堆栈位置规则有误差，代价是可能产生重复 PR；</p></li>
-<li><p><strong>静态置信度有天花板</strong>：Agent 跑不了真实回归测试，&quot;可选链不会破坏逻辑&quot;只能靠静态推理 + 人工 review 兜底；构建复杂、宏多、类型体操重的项目误改风险更高；</p></li>
-<li><p><strong>业务语义理解有限</strong>：报告里的&quot;根因假设&quot;&quot;业务影响&quot;本质是推测，直接采信会引入新风险；</p></li>
-<li><p><strong>规则有维护成本</strong>：过松放大风险，过严让 Agent 长期&quot;只报告&quot;，自动化名存实亡；</p></li>
-<li><p><strong>上报层自身有盲区</strong>：接管 <code>GlobalHandlers</code> 需自行跟进 SDK 升级；过滤过激会挡住真错误（如发布窗口外出现的动态导入失败可能被低估）；<code>filter.ts</code> 依赖内存数组，刷新后计数清零；</p></li>
-<li><p><strong>权限心智负担</strong>：给 CI Agent 仓库写权限本身就需要谨慎评估。</p></li>
+  <a href="#五、收益和代价" id="五、收益和代价"></a>五、收益和代价
+</h2><p>收益方面：错误处理周期从数周压到一周以内，需要的话 fatal 可以单独提频；triage 这类低价值劳动基本消失；每个修复都有 Sentry issue → PR → 汇总 Issue 的引用链可查；每周必有回音，反过来，&quot;这周没消息&quot;本身就是一个信号。</p><p>代价和边界也得说清楚：</p><ol>
+<li>单点修复不等于根治。反复出现、影响面大的问题往往卡在业务逻辑或架构层，恰好是 Agent 修不了、只能报告的部分。</li>
+<li>治标会累积。埋点上报之后如果没人跟进验证，防护代码就一直留着，埋点本身也会变成新的噪音。</li>
+<li>启发式会误判。文本相似度、堆栈位置这两类规则都有误差，代价是可能产生重复 PR。</li>
+<li>静态置信度有天花板。Agent 跑不了真实回归测试，&quot;可选链不会破坏逻辑&quot;只能靠静态推理加人工 review 兜底。构建复杂、宏多、类型体操重的项目，误改风险更高。</li>
+<li>业务语义理解有限。报告里的&quot;根因假设&quot;&quot;业务影响&quot;本质都是推测，直接采信会引入新风险。</li>
+<li>规则有维护成本。放得太松风险变大，收得太紧 Agent 会长期只报告，自动化就名存实亡。</li>
+<li>上报层自己也有盲区。接管 <code>GlobalHandlers</code> 意味着要自己跟进 SDK 升级；过滤过激会挡住真错误，比如发布窗口之外出现的动态导入失败可能被低估；<code>filter.ts</code> 依赖内存数组，刷新后计数清零。</li>
+<li>权限上的心智负担。给 CI Agent 仓库写权限这件事，本身就需要单独评估。</li>
 </ol>
-<p><strong>落地注意</strong>：凭据最小权限（Sentry 只读、GitHub 限定目标 repo）；项目规范若要求&quot;实施前必须与用户确认&quot;，无人值守场景需显式豁免，否则 Agent 会卡死；<code>environment=production</code> 与 <code>release:latest</code> 要按实际调整，防止 dev/test 混入；上报层过滤规则应随噪音演进，新业务上线后先考虑在上游过滤而非在流水线加特判；若连续几周都是&quot;非代码问题 8 个&quot;，该回头查发布流程或上报策略；标题日期用执行当天，统计范围固定为执行时刻往前 7 天。</p><h2>
-  <a href="#七、结语" id="七、结语"></a>七、结语
-</h2><p>方案的本质是<strong>把自动化用在置信度最高的环节</strong>：拉取、分类、去重、通知是确定性工作，全自动；单点机械修复是高置信工作，自动化 + 人审；业务逻辑与架构问题是低置信工作，只做结构化诊断。三条线各归其位，才敢无人值守。</p><p>建议先以&quot;只报告不修复&quot;跑两三周，观察分类准确率与报告质量，再逐步打开修复模式——这也是我们实际走过的路径。</p><h2>
+<p>落地时还有几件事要处理：凭据给最小权限，Sentry 只读，GitHub 限定目标 repo；项目规范如果要求&quot;实施前必须与用户确认&quot;，无人值守场景要显式豁免，否则 Agent 会卡在这一步；<code>environment=production</code> 和 <code>release:latest</code> 按实际情况调整，别让 dev/test 混进来；过滤规则跟着噪音演进，新业务上线后优先在上游过滤，而不是在流水线里加特判。如果连续几周都是&quot;非代码问题 8 个&quot;，该回头查的是发布流程和上报策略，不是 Agent。标题里的日期用执行当天，统计范围固定为执行时刻往前 7 天。</p><h2>
+  <a href="#六、最后" id="六、最后"></a>六、最后
+</h2><p>这套东西的分工其实很清楚：拉取、分类、去重、通知是确定性的活，全自动；单点机械修复是高置信的活，自动做加人工 review；业务逻辑和架构问题置信度低，只做结构化诊断。</p><p>我们不是一步到位的。前两三周只开报告模式，不开修复，先看分类准不准、报告有没有信息量，确认之后才逐步打开修复。如果你也要落地，建议同样从只报告开始。</p><h2>
   <a href="#附录：提示词骨架（已脱敏）" id="附录：提示词骨架（已脱敏）"></a>附录：提示词骨架（已脱敏）
-</h2><p><code>&lt;&gt;</code> 内为需替换的占位符。</p><div class="code-highlight">
+</h2><p><code>&lt;&gt;</code> 内是需要替换的占位符。</p><div class="code-highlight">
   <table>
     <tbody>
       <tr>
@@ -525,8 +526,8 @@ curl -H &quot;Authorization: Bearer ${SENTRY_TOKEN}&quot; \
 
 ## 4. 分析并尝试修复
 curl -H &quot;Authorization: Bearer ${SENTRY_TOKEN}&quot; \
-  &quot;https:&#x2F;&#x2F;sentry.io&#x2F;api&#x2F;0&#x2F;organizations&#x2F;&lt;your-org&gt;&#x2F;issues&#x2F;&lt;issue-id&gt;&#x2F;\
-events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;
+  &quot;https:&#x2F;&#x2F;sentry.io&#x2F;api&#x2F;0&#x2F;organizations&#x2F;&lt;your-org&gt;&#x2F;issues&#x2F;&lt;issue-id&gt;\
+&#x2F;events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;
 - 堆栈获取失败：归入报告模式，注明&quot;无法获取有效堆栈&quot;。
 
 ### 修复模式
