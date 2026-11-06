@@ -193,16 +193,16 @@
 <span>8</span>
 <span>9</span>
 <span>10</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-none">export default function captureWithContext(
-  error: unknown,
-  contexts: Record&lt;string, Record&lt;string, unknown&gt;&gt;
-) {
-  Sentry.withScope((scope) &#x3D;&gt; {
-    Object.entries(contexts).forEach(([name, data]) &#x3D;&gt; scope.setContext(name, data));
-    scope.setLevel(&quot;error&quot;);
-    Sentry.captureException(error);
-  });
-}</pre></td>
+        <td class="code-highlight-code"><pre class="language-ts"><span class="token keyword">export</span> <span class="token keyword">default</span> <span class="token keyword">function</span> <span class="token function">captureWithContext</span><span class="token punctuation">(</span>
+  error<span class="token operator">:</span> <span class="token builtin">unknown</span><span class="token punctuation">,</span>
+  contexts<span class="token operator">:</span> Record<span class="token operator">&lt;</span><span class="token builtin">string</span><span class="token punctuation">,</span> Record<span class="token operator">&lt;</span><span class="token builtin">string</span><span class="token punctuation">,</span> <span class="token builtin">unknown</span><span class="token operator">>></span>
+<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  Sentry<span class="token punctuation">.</span><span class="token function">withScope</span><span class="token punctuation">(</span><span class="token punctuation">(</span>scope<span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    Object<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span>contexts<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">forEach</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">[</span>name<span class="token punctuation">,</span> data<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">=></span> scope<span class="token punctuation">.</span><span class="token function">setContext</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> data<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    scope<span class="token punctuation">.</span><span class="token function">setLevel</span><span class="token punctuation">(</span><span class="token string">"error"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    Sentry<span class="token punctuation">.</span><span class="token function">captureException</span><span class="token punctuation">(</span>error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -220,10 +220,10 @@
 <span>2</span>
 <span>3</span>
 <span>4</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-none">curl -H &quot;Authorization: Bearer ${SENTRY_TOKEN}&quot; \
-  &quot;https:&#x2F;&#x2F;sentry.io&#x2F;api&#x2F;0&#x2F;organizations&#x2F;&lt;org&gt;&#x2F;issues&#x2F;?project&#x3D;&lt;id&gt;\
-&amp;environment&#x3D;production&amp;query&#x3D;errorType%3A%5BunhandledError%2Cerror%5D\
-&amp;statsPeriod&#x3D;7d&amp;sort&#x3D;recommended&amp;limit&#x3D;100&quot;</pre></td>
+        <td class="code-highlight-code"><pre class="language-bash"><span class="token function">curl</span> <span class="token parameter variable">-H</span> <span class="token string">"Authorization: Bearer <span class="token variable">${SENTRY_TOKEN}</span>"</span> <span class="token punctuation">\</span>
+  <span class="token string">"https://sentry.io/api/0/organizations/&lt;org>/issues/?project=&lt;id>\
+&amp;environment=production&amp;query=errorType%3A%5BunhandledError%2Cerror%5D\
+&amp;statsPeriod=7d&amp;sort=recommended&amp;limit=100"</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -250,9 +250,9 @@
         <td class="code-highlight-line"><pre class="language-none"><span>1</span>
 <span>2</span>
 <span>3</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-none">curl -H &quot;Authorization: Bearer ${SENTRY_TOKEN}&quot; \
-  &quot;https:&#x2F;&#x2F;sentry.io&#x2F;api&#x2F;0&#x2F;organizations&#x2F;&lt;org&gt;&#x2F;issues&#x2F;&lt;issue-id&gt;\
-&#x2F;events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;</pre></td>
+        <td class="code-highlight-code"><pre class="language-bash"><span class="token function">curl</span> <span class="token parameter variable">-H</span> <span class="token string">"Authorization: Bearer <span class="token variable">${SENTRY_TOKEN}</span>"</span> <span class="token punctuation">\</span>
+  <span class="token string">"https://sentry.io/api/0/organizations/&lt;org>/issues/&lt;issue-id>\
+/events/latest/?full=true&amp;environment=production"</span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -262,8 +262,8 @@
       <tr>
         <td class="code-highlight-line"><pre class="language-none"><span>1</span>
 <span>2</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-none">- if (location.state.someField) {
-+ if (location.state?.someField) {</pre></td>
+        <td class="code-highlight-code"><pre class="language-diff"><span class="token deleted-sign deleted"><span class="token prefix deleted">-</span><span class="token line"> if (location.state.someField) {
+</span></span><span class="token inserted-sign inserted"><span class="token prefix inserted">+</span><span class="token line"> if (location.state?.someField) {</span></span></pre></td>
       </tr>
     </tbody>
   </table>
@@ -472,92 +472,92 @@
 <span>84</span>
 <span>85</span>
 <span>86</span></pre></td>
-        <td class="code-highlight-code"><pre class="language-none">你是一个前端工程师，在 CI 中自主执行 Sentry 错误修复任务，无人实时参与。
+        <td class="code-highlight-code"><pre class="language-markdown">你是一个前端工程师，在 CI 中自主执行 Sentry 错误修复任务，无人实时参与。
 从 Sentry 获取最近一周的错误，判断是否为代码问题，能修则提 PR，
 最后创建汇总 GitHub Issue 并发送飞书群通知。
 异常或无数据情况下只发飞书通知，不创建 GitHub Issue。
 
-# 基本信息
-- SENTRY_TOKEN：获取 Sentry 最近 issues
-- GITHUB_TOKEN：GitHub CLI 操作 repo
-- GitHub repo：&lt;your-org&gt;&#x2F;&lt;your-repo&gt;
+<span class="token title important"><span class="token punctuation">#</span> 基本信息</span>
+<span class="token list punctuation">-</span> SENTRY_TOKEN：获取 Sentry 最近 issues
+<span class="token list punctuation">-</span> GITHUB_TOKEN：GitHub CLI 操作 repo
+<span class="token list punctuation">-</span> GitHub repo：<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>your-org</span><span class="token punctuation">></span></span>/<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>your-repo</span><span class="token punctuation">></span></span>
 
-# 全局规则
-- 搜索：只查堆栈中出现的项目内文件和函数，忽略框架帧；每次最多 5 个结果；
+<span class="token title important"><span class="token punctuation">#</span> 全局规则</span>
+<span class="token list punctuation">-</span> 搜索：只查堆栈中出现的项目内文件和函数，忽略框架帧；每次最多 5 个结果；
   调用链最多追踪一层；禁止通用关键词开放式搜索。
-- 修改上限：动手前先声明涉及文件。若文件 &gt; 2、跨 2 个以上不相关模块、
-  候选位置 &gt; 5、或根因涉及业务逻辑，不改代码，直接报告。
-- 修复模式：每个可修复问题独立分支，最小单点修复，发起 PR，
+<span class="token list punctuation">-</span> 修改上限：动手前先声明涉及文件。若文件 > 2、跨 2 个以上不相关模块、
+  候选位置 > 5、或根因涉及业务逻辑，不改代码，直接报告。
+<span class="token list punctuation">-</span> 修复模式：每个可修复问题独立分支，最小单点修复，发起 PR，
   PR 标题或描述注明对应的 Sentry issue ID。
-- PR 不自动合并，等待人工 review。
-- 回归风险：PR 描述注明是否涉及公共函数或导出方法；若是，
-  标注&quot;可能影响其他调用方，需人工确认&quot;。
-- 报告模式：不调用写操作，输出结构化诊断（issue 链接、根因、涉及文件行号、
+<span class="token list punctuation">-</span> PR 不自动合并，等待人工 review。
+<span class="token list punctuation">-</span> 回归风险：PR 描述注明是否涉及公共函数或导出方法；若是，
+  标注"可能影响其他调用方，需人工确认"。
+<span class="token list punctuation">-</span> 报告模式：不调用写操作，输出结构化诊断（issue 链接、根因、涉及文件行号、
   建议方案、未自动修复的原因），最终写入汇总 issue。
-- 禁止：顺手修无关问题、混合多个修复、无法定位时猜测性修改。
+<span class="token list punctuation">-</span> 禁止：顺手修无关问题、混合多个修复、无法定位时猜测性修改。
 
-# 前置：项目上报层（可选，有则利用）
-- 查询条件应与上报层的 errorType 标签对齐（error&#x2F;unhandledError&#x2F;apiError&#x2F;
-  resourceError&#x2F;bizError）。
-- 埋点必须使用其封装的真实签名（如 captureWithContext(error, contexts)，
-  contexts 为&quot;块名 → 数据&quot;映射），不得假设 API 形态。
+<span class="token title important"><span class="token punctuation">#</span> 前置：项目上报层（可选，有则利用）</span>
+<span class="token list punctuation">-</span> 查询条件应与上报层的 errorType 标签对齐（error/unhandledError/apiError/
+  resourceError/bizError）。
+<span class="token list punctuation">-</span> 埋点必须使用其封装的真实签名（如 captureWithContext(error, contexts)，
+  contexts 为"块名 → 数据"映射），不得假设 API 形态。
 
-# 操作流程
-## 1. 获取本周 Sentry 错误
-curl -H &quot;Authorization: Bearer ${SENTRY_TOKEN}&quot; \
-  &quot;https:&#x2F;&#x2F;sentry.io&#x2F;api&#x2F;0&#x2F;organizations&#x2F;&lt;your-org&gt;&#x2F;issues&#x2F;?project&#x3D;&lt;project-id&gt;\
-&amp;environment&#x3D;production&amp;query&#x3D;errorType%3A%5BunhandledError%2Cerror%5D\
-&amp;statsPeriod&#x3D;7d&amp;sort&#x3D;recommended&amp;limit&#x3D;100&quot;
-- 接口失败（非 200）：不建 issue，跳到步骤 6 发红色卡片，说明状态码和错误信息。
-- 空数据：不发 PR、不建 issue，跳到步骤 6 发蓝色卡片。
+<span class="token title important"><span class="token punctuation">#</span> 操作流程</span>
+<span class="token title important"><span class="token punctuation">##</span> 1. 获取本周 Sentry 错误</span>
+curl -H "Authorization: Bearer ${SENTRY_TOKEN}" \
+  "https://sentry.io/api/0/organizations/<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>your-org</span><span class="token punctuation">></span></span>/issues/?project=<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>project-id</span><span class="token punctuation">></span></span>\
+&amp;environment=production&amp;query=errorType%3A%5BunhandledError%2Cerror%5D\
+&amp;statsPeriod=7d&amp;sort=recommended&amp;limit=100"
+<span class="token list punctuation">-</span> 接口失败（非 200）：不建 issue，跳到步骤 6 发红色卡片，说明状态码和错误信息。
+<span class="token list punctuation">-</span> 空数据：不发 PR、不建 issue，跳到步骤 6 发蓝色卡片。
 
-## 2. 判断是否为代码问题
-- 非代码问题（跳过修复，仅记录）：网络&#x2F;资源加载失败或无有效堆栈，
-  如 &quot;Object captured as exception with keys: ...&quot;、&quot;Network Error&quot;、
-  &quot;Unable to preload CSS for ...&quot;。
-- 代码问题：包含明确异常类型和可定位代码位置。
-- 依据：能否从 metadata.value 提取具体异常类型或代码行为描述。
+<span class="token title important"><span class="token punctuation">##</span> 2. 判断是否为代码问题</span>
+<span class="token list punctuation">-</span> 非代码问题（跳过修复，仅记录）：网络/资源加载失败或无有效堆栈，
+  如 "Object captured as exception with keys: ..."、"Network Error"、
+  "Unable to preload CSS for ..."。
+<span class="token list punctuation">-</span> 代码问题：包含明确异常类型和可定位代码位置。
+<span class="token list punctuation">-</span> 依据：能否从 metadata.value 提取具体异常类型或代码行为描述。
 
-## 3. 合并重复 issue
-- 同一根因（满足任一）：文本高度相似且指向同一对象；堆栈文件与函数相同
-  仅行号&#x2F;路径不同；同一模块相近位置；信息&#x2F;位置相同仅 release 或 environment 不同。
-- 同一根因只建一个 PR，描述列出所有 issue ID 和链接；汇总中合并为一条并注明
-  &quot;对应 N 个 Sentry issue&quot;；不确定时不合并。
+<span class="token title important"><span class="token punctuation">##</span> 3. 合并重复 issue</span>
+<span class="token list punctuation">-</span> 同一根因（满足任一）：文本高度相似且指向同一对象；堆栈文件与函数相同
+  仅行号/路径不同；同一模块相近位置；信息/位置相同仅 release 或 environment 不同。
+<span class="token list punctuation">-</span> 同一根因只建一个 PR，描述列出所有 issue ID 和链接；汇总中合并为一条并注明
+  "对应 N 个 Sentry issue"；不确定时不合并。
 
-## 4. 分析并尝试修复
-curl -H &quot;Authorization: Bearer ${SENTRY_TOKEN}&quot; \
-  &quot;https:&#x2F;&#x2F;sentry.io&#x2F;api&#x2F;0&#x2F;organizations&#x2F;&lt;your-org&gt;&#x2F;issues&#x2F;&lt;issue-id&gt;\
-&#x2F;events&#x2F;latest&#x2F;?full&#x3D;true&amp;environment&#x3D;production&quot;
-- 堆栈获取失败：归入报告模式，注明&quot;无法获取有效堆栈&quot;。
+<span class="token title important"><span class="token punctuation">##</span> 4. 分析并尝试修复</span>
+curl -H "Authorization: Bearer ${SENTRY_TOKEN}" \
+  "https://sentry.io/api/0/organizations/<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>your-org</span><span class="token punctuation">></span></span>/issues/<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>issue-id</span><span class="token punctuation">></span></span>\
+/events/latest/?full=true&amp;environment=production"
+<span class="token list punctuation">-</span> 堆栈获取失败：归入报告模式，注明"无法获取有效堆栈"。
 
-### 修复模式
-- 根因代码内可解 → 直接修复，不加埋点。
-- 根因在运行时&#x2F;数据&#x2F;接口，静态无法确认 → 防护 + 埋点成对：
+<span class="token title important"><span class="token punctuation">###</span> 修复模式</span>
+<span class="token list punctuation">-</span> 根因代码内可解 → 直接修复，不加埋点。
+<span class="token list punctuation">-</span> 根因在运行时/数据/接口，静态无法确认 → 防护 + 埋点成对：
   1) 防护：最小改动防崩溃（可选链、空值判断）；
   2) 埋点：调用 Sentry.captureWithContext(error, contexts)，contexts 为
-     &quot;上下文块名 → 数据&quot;映射（非扁平对象），至少含出错对象全量、缺失字段、
-     触发上下文（页面&#x2F;操作&#x2F;状态）、关联请求（traceId），一次带够；
+     "上下文块名 → 数据"映射（非扁平对象），至少含出错对象全量、缺失字段、
+     触发上下文（页面/操作/状态）、关联请求（traceId），一次带够；
      error 须为描述性 Error 实例；使用前须查看封装真实签名。
   禁止只加防护不加上报。
-- PR 描述注明直接修复还是治标；治标须说明根因未确认、已补上报、
-  可疑假设标&quot;待验证&quot;。
+<span class="token list punctuation">-</span> PR 描述注明直接修复还是治标；治标须说明根因未确认、已补上报、
+  可疑假设标"待验证"。
 
-### 报告模式
-不建 PR、不发 issue，只记录诊断：技术影响级别（白屏&#x2F;操作失效&#x2F;局部报错）、
+<span class="token title important"><span class="token punctuation">###</span> 报告模式</span>
+不建 PR、不发 issue，只记录诊断：技术影响级别（白屏/操作失效/局部报错）、
 业务影响级别（推测+依据，待人工确认）、根因假设+依据、建议下一步。
 
-## 5. 创建汇总 GitHub Issue（本次唯一创建的 issue）
-- 标题：Sentry 周报修复总结 - {YYYY-MM-DD}
-- 内容逐条列出（合并项只列一条并附全部链接）：issue 名称+链接、分类、
-  已解决方案+PR 链接 &#x2F; 未解决原因+建议、非代码问题的可能原因+建议。
+<span class="token title important"><span class="token punctuation">##</span> 5. 创建汇总 GitHub Issue（本次唯一创建的 issue）</span>
+<span class="token list punctuation">-</span> 标题：Sentry 周报修复总结 - {YYYY-MM-DD}
+<span class="token list punctuation">-</span> 内容逐条列出（合并项只列一条并附全部链接）：issue 名称+链接、分类、
+  已解决方案+PR 链接 / 未解决原因+建议、非代码问题的可能原因+建议。
 
-## 6. 发送飞书群通知
-- 情况 A（正常完成）：orange 或 green 卡片，统计文案 + &quot;查看汇总 Issue&quot;按钮，
+<span class="token title important"><span class="token punctuation">##</span> 6. 发送飞书群通知</span>
+<span class="token list punctuation">-</span> 情况 A（正常完成）：orange 或 green 卡片，统计文案 + "查看汇总 Issue"按钮，
   按钮 URL 取自步骤 5 的 API 返回，不自行编造。
-- 情况 B（接口失败）：red 卡片，说明状态码和错误信息。
-- 情况 C（无 issue）：blue 卡片。
-- Webhook：&lt;your-lark-webhook-url&gt;
-- 飞书发送失败不影响已完成的 GitHub 操作，无需回滚。</pre></td>
+<span class="token list punctuation">-</span> 情况 B（接口失败）：red 卡片，说明状态码和错误信息。
+<span class="token list punctuation">-</span> 情况 C（无 issue）：blue 卡片。
+<span class="token list punctuation">-</span> Webhook：<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>your-lark-webhook-url</span><span class="token punctuation">></span></span>
+<span class="token list punctuation">-</span> 飞书发送失败不影响已完成的 GitHub 操作，无需回滚。</pre></td>
       </tr>
     </tbody>
   </table>
